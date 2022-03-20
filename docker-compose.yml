@@ -1,0 +1,71 @@
+version: "3.7"
+services:
+  mysql-development:
+    image: mysql:5.7
+    platform: linux/amd64
+    container_name: mysql-development
+    # Override default sql_mode to disable the ONLY_FULL_GROUP_BY and STRICT_TRANS_TABLES settings
+    command: --sql_mode=NO_ENGINE_SUBSTITUTION --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --general-log=ON --innodb-use-native-aio=0 --log-bin=/var/lib/mysql/mysql-bin.log --server-id=1
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_DATABASE=my_database
+    volumes:
+      - ./schema/development:/docker-entrypoint-initdb.d
+    ports:
+      - 3306:3306
+
+  mysql-staging:
+    image: mysql:5.7
+    platform: linux/amd64
+    container_name: mysql-staging
+    # Override default sql_mode to disable the ONLY_FULL_GROUP_BY and STRICT_TRANS_TABLES settings
+    command: --sql_mode=NO_ENGINE_SUBSTITUTION --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --general-log=ON --innodb-use-native-aio=0 --log-bin=/var/lib/mysql/mysql-bin.log --server-id=2
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_DATABASE=my_database
+    volumes:
+      - ./schema/staging:/docker-entrypoint-initdb.d
+    ports:
+      - 3307:3306
+
+  mysql-production:
+    image: mysql:5.7
+    platform: linux/amd64
+    container_name: mysql-production
+    # Override default sql_mode to disable the ONLY_FULL_GROUP_BY and STRICT_TRANS_TABLES settings
+    command: --sql_mode=NO_ENGINE_SUBSTITUTION --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --general-log=ON --innodb-use-native-aio=0 --log-bin=/var/lib/mysql/mysql-bin.log --server-id=3
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_DATABASE=my_database
+    volumes:
+      - ./schema/production:/docker-entrypoint-initdb.d
+    ports:
+      - 3308:3306
+
+  # usage:
+  # - dev: "docker-compose run --rm mysql-client mysql -hmysql-development -uroot"
+  # - staging: "docker-compose run --rm mysql-client mysql -hmysql-staging -uroot"
+  # - prod: "docker-compose run --rm mysql-client mysql -hmysql-production -uroot"
+  mysql-client:
+    image: mysql:5.7
+    platform: linux/amd64
+    container_name: mysql-client
+    # exit immediately unless this is run with docker-compose run...
+    command: exit
+
+  # usage:
+  # - "COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker-compose run --rm skeema bash"
+  skeema:
+    image: teamsnap/skeema:0.0.2
+    platform: linux/amd64
+    container_name: skeema
+    working_dir: /skeema
+    build:
+      context: .
+      dockerfile: Skeema.dockerfile
+    volumes:
+      - ./skeema-data:/skeema/
+
