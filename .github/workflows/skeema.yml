@@ -1,0 +1,77 @@
+name: Skeema Diff
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  skeema-diff:
+    runs-on: ubuntu-latest
+    env:
+      DB_DATABASE: my_database
+      DB_USER: root
+      DB_PASSWORD: root
+      SKEEMA_VERSION: "1.7.0"
+    steps:
+    # checkout the base branch first (main in most cases) so we can set up the MySQL server and diff it with the PR branch after
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+    
+    # MySQL ships with ubuntu VMs: https://github.blog/changelog/2020-02-21-github-actions-breaking-change-ubuntu-virtual-environments-will-no-longer-start-the-mysql-service-automatically/
+    - name: Set up MySQL
+      run: |
+        sudo /etc/init.d/mysql start
+        mysql -e 'CREATE DATABASE ${{ env.DB_DATABASE }};' -u${{ env.DB_USER }} -p${{ env.DB_PASSWORD }}
+
+    # install skeema bin at /tmp/tools/skeema
+    - name: Download Skeema
+      run: |
+        mkdir -p /tmp/tools
+        curl -Lo /tmp/tools/skeema.tar.gz "https://github.com/skeema/skeema/releases/download/v${SKEEMA_VERSION}/skeema_${SKEEMA_VERSION}_linux_$(dpkg --print-architecture).tar.gz"
+        tar --directory /tmp/tools/ -xzvf /tmp/tools/skeema.tar.gz skeema
+        rm /tmp/tools/skeema.tar.gz
+
+    # install skeema bin at /tmp/tools/skeema
+    - name: Download Skeema
+      run: |
+        mkdir -p /tmp/tools
+        curl -Lo /tmp/tools/skeema.tar.gz "https://github.com/skeema/skeema/releases/download/v${SKEEMA_VERSION}/skeema_${SKEEMA_VERSION}_linux_$(dpkg --print-architecture).tar.gz"
+        tar --directory /tmp/tools/ -xzvf /tmp/tools/skeema.tar.gz skeema
+        rm /tmp/tools/skeema.tar.gz
+
+    # set up the database with what's currently on the base branch
+    - name: Run skeema push with base branch checked out
+      env:
+        MYSQL_PWD: root
+      run: |
+        cd skeema-gh-actions-demo
+        /tmp/tools/skeema push ci-diff-host
+
+    # checkout our PRs branch
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    # stolen/based on https://github.com/github/gh-mysql-tools/blob/master/skeefree/.github/workflows/skeema-diff.yml
+    - name: skeema diff
+      # Now that we've checked out the PR's branch, we can compare the schema in our PR to that we pushed into MySQL.
+      #
+      # `skeema push ci-diff-host --ddl-wrapper` is a hack to add special markers before & after each DDL statement. If curious,
+      # see discussion on https://github.com/skeema/skeema/pull/98
+      # TL;DR the `push` does not actually make changes, just generates output.
+      # skeefree later uses those special markers to reliably identify the DDL statements.
+      env:
+        MYSQL_PWD: root
+      run: |
+        cd skeema-gh-actions-demo
+        /tmp/tools/skeema push ci-diff-host --allow-unsafe --ddl-wrapper='echo "\n-- skeema:ddl:begin\n"{DDL}";\n-- skeema:ddl:end"' | sed -e 's/^USE /-- skeema:ddl:use /g' | sed -n '/^-- skeema:ddl:use /p;/^-- skeema:ddl:begin/,/^-- skeema:ddl:end/p' | tee /tmp/tools/skeema-diff.sql
+    
+    - name: validate diff
+      run: |
+        count_schemas_changed="$(egrep -c '^-- skeema:ddl:use' /tmp/tools/skeema-diff.sql || :)"
+        echo "diff validation: ${count_schemas_changed} schemas changed."
+        if [ $count_schemas_changed -gt 1 ] ; then
+          echo "Multiple schemas changed. Not supported!"
+          exit 1
+        fi
