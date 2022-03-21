@@ -6,6 +6,12 @@ host=mysql-production
 port=3306
 user=root
 
+[development]
+flavor=mysql:5.7
+host=mysql-development
+port=3306
+user=root
+
 [ci-diff-host]
 flavor=mysql:5.7
 host=127.0.0.1
