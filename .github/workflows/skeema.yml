@@ -45,7 +45,7 @@ jobs:
       env:
         MYSQL_PWD: root
       run: |
-        cd skeema-gh-actions-demo
+        cd skeema-gh-actions-demo/schemas
         /tmp/tools/skeema push ci-diff-host
 
     # checkout our PRs branch
@@ -64,7 +64,7 @@ jobs:
       env:
         MYSQL_PWD: root
       run: |
-        cd skeema-gh-actions-demo
+        cd skeema-gh-actions-demo/schemas
         /tmp/tools/skeema push ci-diff-host --allow-unsafe --ddl-wrapper='echo "\n-- skeema:ddl:begin\n"{DDL}";\n-- skeema:ddl:end"' | sed -e 's/^USE /-- skeema:ddl:use /g' | sed -n '/^-- skeema:ddl:use /p;/^-- skeema:ddl:begin/,/^-- skeema:ddl:end/p' | tee /tmp/tools/skeema-diff.sql
     
     - name: validate diff
