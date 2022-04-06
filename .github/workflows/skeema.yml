@@ -45,7 +45,7 @@ jobs:
       env:
         MYSQL_PWD: root
       run: |
-        cd skeema-gh-actions-demo
+        cd skeema-gh-actions-demo/schemas
         /tmp/tools/skeema push ci-diff-host
 
     # checkout our PRs branch
@@ -64,7 +64,7 @@ jobs:
       env:
         MYSQL_PWD: root
       run: |
-        cd skeema-gh-actions-demo
+        cd skeema-gh-actions-demo/schemas
         /tmp/tools/skeema push ci-diff-host --allow-unsafe --ddl-wrapper='echo "\n-- skeema:ddl:begin\n"{DDL}";\n-- skeema:ddl:end"' | sed -e 's/^USE /-- skeema:ddl:use /g' | sed -n '/^-- skeema:ddl:use /p;/^-- skeema:ddl:begin/,/^-- skeema:ddl:end/p' | tee /tmp/tools/skeema-diff.sql
     
     - name: validate diff
@@ -75,3 +75,29 @@ jobs:
           echo "Multiple schemas changed. Not supported!"
           exit 1
         fi
+
+    - uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs')
+          let data = 'Failed to read in Skeema diff file.'
+          try {
+            data = fs.readFileSync('/tmp/tools/skeema-diff.sql', 'utf8')
+            console.log(data)
+          } catch (err) {
+            console.error(err)
+          }
+          const output = `#### Skeema Diff 🖌 
+          <details><summary>Show Diff</summary>
+          \`\`\`
+          ${data}
+          \`\`\`
+          </details>
+          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
